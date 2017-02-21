@@ -30,6 +30,7 @@
 #include <sys/types.h>
 
 #define ARGC 2
+#define READ_FILE_BUFSIZE 200
 
 void display_help()
 {
@@ -39,6 +40,44 @@ void display_help()
     puts("    IPaddr username passwd");
     puts("cmd_file:");
     puts("    One command per line.");
+}
+
+void clean_up_session(LIBSSH2_SESSION *session)
+{
+    libsshe_session_disconnect(session, "Shuting down, thank you.");
+    libssh2_session_free(session);
+    session = NULL;
+}
+
+void clean_up_sock_libssh2(int sock)
+{
+#ifdef WIN32
+    closesocket(sock);
+#else
+    close(sock);
+#endif
+    libssh2_exit();
+    printf("Terminated.\n");
+}
+
+void clean_up_channel(LIBSSH2_CHANNEL *channel)
+{
+    int exitcode;
+    int t;
+    char *exitsignal = NULL;
+
+    t = libssh2_channel_close(channel);
+    if (0 == t)
+    {
+        exitcode = libssh2_channel_get_exit_status(channel);
+        libssh2_channel_get_exit_signal(channel, &exitsignal, NULL, NULL, NULL, NULL, NULL);
+    }
+    if (exitsignal)
+        printf("Got signal: %s\n", exitsignal);
+    else
+        printf("Abort: %d\n", exitcode);
+    libssh2_channel_free(channel);
+    channel = NULL;
 }
 
 int main(int argc, char *argv[])
@@ -54,6 +93,9 @@ int main(int argc, char *argv[])
     char *username = NULL;
     char *passwd = NULL;
     unsigned long hostaddr;
+
+    char cmd_file_buf[READ_FILE_BUFSIZE];
+    int line_count = 0;
 
     int sock;
     sockaddr_in saddr_in;
@@ -104,6 +146,7 @@ int main(int argc, char *argv[])
 
     printf("Started up. NOTICE: All hosts will be trusted.\n", );
 
+    // Start iterate each host
     while(EOF != fscanf("%s %s %s", hostname, username, passwd))
     {
         printf("Connecting to %s@%s...\n", username, hostname);
@@ -136,5 +179,52 @@ int main(int argc, char *argv[])
             printf("SSH handshake failed with errno: %d\n", t);
             return t;
         }
+
+        // Authenticate via passwd
+        while ((t = libssh2_userauth_password(session, username, passwd)) == LIBSSH2_ERROR_EAGAIN);     // This while loop is for non-blocking session
+        if (0 != t)
+        {
+            printf("Authentication failed.\n");
+            clean_up_session(session);
+            clean_up_sock_libssh2(sock);
+            return t;
+        }
+
+        // Create channel blocking
+        channel = libssh2_channel_open_session(session);
+        if (NULL == channel)
+        {
+            printf("Create channel failed\n");
+            clean_up_session(session);
+            clean_up_sock_libssh2(sock);
+            return -1;
+        }
+
+        // Read cmd_file
+        // For now, the file for each host is same, but they will be different in the future.
+        cmd_file = fopen(cmd_file_path, "r");
+        if (NULL == cmd_file)
+        {
+            printf("Open file <%s> failed. Errno: %d\n", cmd_file_path, errno);
+            return errno;
+        }
+
+        // Execute each command
+        while (NULL != fgets(cmd_file_buf, READ_FILE_BUFSIZE, cmd_file))
+        {
+            line_count++;
+            t = libssh2_channel_exec(channel, cmd_file_buf);
+            if (t != 0)
+            {
+                printf("Exec failed on line: %d.\n", line_count);
+                clean_up_channel(channel);
+                clean_up_session(session);
+                clean_up_sock_libssh2(sock);
+                return t;
+            }
+        }
+        line_count = 0;
+        fclose(cmd_file);
     }
+    fclose(hosts_file);
 }
