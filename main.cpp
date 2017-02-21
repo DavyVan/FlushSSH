@@ -1,86 +1,140 @@
 #include <cstdio>
-#include <libssh/libssh.h>
+#include <cstdlib>
+#include <fcntl.h>
+#include <errno.h>
+#include <ctype.h>
 #include "FlushSSHConfig.h"
+#include <libssh2.h>
 
-int verify_knownhost(ssh_session session)
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <sys/types.h>
+
+#define ARGC 2
+
+void display_help()
 {
-    int state = ssh_is_server_known(session);
-    switch (state)
-    {
-        case SSH_SERVER_KNOWN_OK:
-            return 0;
-
-        case SSH_SERVER_ERROR:
-            printf("Error: %s\n", ssh_get_error(session));
-            return -1;
-
-        case SSH_SERVER_KNOWN_CHANGED:
-            printf("Host key for server was changed, updated.\n");
-            break;
-
-        case SSH_SERVER_FOUND_OTHER:
-            printf("The host key for this server was not found but an other type of key exists, updated.\n");
-            break;
-
-        case SSH_SERVER_FILE_NOT_FOUND:
-            printf("Could not find known host file. Created.\n");
-            break;
-
-        case SSH_SERVER_NOT_KNOWN:
-            printf("This is a new server. Trusted.\n");
-            break;
-    }
-    if(ssh_write_knownhost(session) < 0)
-    {
-        printf("Error: write known host failed.\n");
-        return -1;
-    }
-    return 0;
+    puts("Usage: FlushSSH hosts_file cmd_file");
+    puts("       Ctrl+C will terminate elegantly");
+    puts("hosts_file:");
+    puts("    IPaddr username passwd");
+    puts("cmd_file:");
+    puts("    One command per line.");
 }
 
-int main(int argc, char const *argv[]) {
-    printf("adsfsfsdfsfd\n");
-    printf("Hello world!! Version:%d.%d\n", FlushSSH_VERSION_MAJOR, FlushSSH_VERSION_MINOR);
+int main(int argc, char *argv[])
+{
+    // Claims
+    const char *hosts_file_path = NULL;
+    const char *cmd_file_path = NULL;
 
-    // libssh test
-    // new session and connection
-    ssh_session session = ssh_new();
-    if(session == NULL)
+    FILE *hosts_file = NULL;
+    FILE *cmd_file = NULL;
+
+    char *hostname = NULL;
+    char *username = NULL;
+    char *passwd = NULL;
+    unsigned long hostaddr;
+
+    int sock;
+    sockaddr_in saddr_in;
+    LIBSSH2_SESSION *session = NULL;
+    LIBSSH2_CHANNEL *channel = NULL;
+
+    int t;
+
+    // Parse arguements
+    // For now, no prefix, only compare the number of arguements
+    if (argc != ARGC + 1)   // Wrong
     {
-        printf("ssh_session creation failed!\n");
-        exit(-1);
+        display_help();
+        return -1;
+    }
+    else    // Valid
+    {
+        hosts_file_path = argv[1];
+        cmd_file_path = argv[2];
     }
 
-    ssh_options_set(session, SSH_OPTIONS_HOST, "192.168.0.100");
-    ssh_options_set(session, SSH_OPTIONS_USER, "fanquan");
-
-    int connection = ssh_connect(session);
-    if(connection != SSH_OK)
+    // Read hosts_file
+    hosts_file = fopen(hosts_file_path, "r");
+    if (NULL == hosts_file)
     {
-        printf("Connection failed!\n");
-        printf("Error MSG: %s\n", ssh_get_error(session));
-        exit(-1);
+        printf("Open file <%s> failed. Errno: %d\n", hosts_file_path, errno);
+        return errno;
     }
 
-    // Authentication
-    if(verify_knownhost(session) < 0)
+    // Initiate Windows Socket API (If need)
+#ifdef WIN32
+    WSADATA wsadata;
+    int err = WSAStartup(MAKEWORD(2, 0), &wsadata);
+    if(0 != err)
     {
-        ssh_disconnect(session);
-        ssh_free(session);
-        exit(-1);
+        printf("Windows Socket API initiating failed with errno: %d\n", err);
+        return err;
     }
-    char *password = "fanquan";
-    connection = ssh_userauth_password(session, NULL, password);
-    if(connection != SSH_AUTH_SUCCESS)
+#endif
+
+    // Initiate libssh2 library
+    t = libssh2_init(0);
+    if (0 != t)
     {
-        printf("Authenticate failed.\nError: %s", ssh_get_error(session));
-        ssh_disconnect(session);
-        ssh_free(session);
-        exit(-1);
+        printf("libssh2 initiating failed with errno: %d\n", t);
+        return t;
     }
 
-    ssh_disconnect(session);
-    ssh_free(session);
+    printf("Started up. NOTICE: All hosts will be trusted.\n", );
 
-    return 0;
+    while(EOF != fscanf("%s %s %s", hostname, username, passwd))
+    {
+        printf("Connecting to %s@%s...\n", username, hostname);
+        hostaddr = inet_addr(hostname);
+
+        // Create a socket connection
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        saddr_in.sin_family = AF_INET;
+        saddr_in.sin_port = htons(22);
+        if (connect(sock, (sockaddr*)(&sin), sizeof(sockaddr_in)) != 0)
+        {
+            printf("Connection failed with errno: %d\n", errno);
+            return errno;
+        }
+
+        // Create a session instance
+        session = libssh2_session_init();
+        if (NULL == session)
+        {
+            printf("SSH session initiating failed.\n");
+            return -1;
+        }
+
+        // blocking session
+
+        // Session start up
+        while ((t = libssh2_session_handshake(session, sock)) == LIBSSH2_ERROR_EAGAIN);     // This while loop is for non-blocking session
+        if (0 != t)
+        {
+            printf("SSH handshake failed with errno: %d\n", t);
+            return t;
+        }
+    }
 }

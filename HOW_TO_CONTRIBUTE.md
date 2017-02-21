@@ -1,9 +1,14 @@
 # How to contribute
-## Requirements
-### Windows
-* libssh: binary installer works well.
-    * 0.7.2 is tested, others are not guaranteed.
-* MinGW compiler
+## Windows
+### Requirements
+* Microsoft Visual Studio 2015 compiler
 * CMake
-* OpenSSL
-    * Windows binary: http://slproweb.com/products/Win32OpenSSL.html
+* libssh2  
+    * Configured with CMake
+    * Built with Visual Studio 2015 compiler
+
+    cd [root_of_libssh2]  
+    mkdir bin  
+    cd bin  
+    cmake ..  
+    cmake --build .  
