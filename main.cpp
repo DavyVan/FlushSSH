@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <memory.h>
 #include "FlushSSHConfig.h"
 #include <libssh2.h>
 
@@ -31,6 +32,7 @@
 
 #define ARGC 2
 #define READ_FILE_BUFSIZE 200
+#define READ_CHANNEL_BUFSIZE 32000
 
 void display_help()
 {
@@ -44,7 +46,7 @@ void display_help()
 
 void clean_up_session(LIBSSH2_SESSION *session)
 {
-    libsshe_session_disconnect(session, "Shuting down, thank you.");
+    libssh2_session_disconnect(session, "Shuting down, thank you.");
     libssh2_session_free(session);
     session = NULL;
 }
@@ -89,18 +91,17 @@ int main(int argc, char *argv[])
     FILE *hosts_file = NULL;
     FILE *cmd_file = NULL;
 
-    char *hostname = NULL;
-    char *username = NULL;
-    char *passwd = NULL;
+    char hostname[100];
+    char username[100];
+    char passwd[100];
     unsigned long hostaddr;
 
     char cmd_file_buf[READ_FILE_BUFSIZE];
     int line_count = 0;
 
-    int sock;
-    sockaddr_in saddr_in;
-    LIBSSH2_SESSION *session = NULL;
-    LIBSSH2_CHANNEL *channel = NULL;
+
+    FILE *echo_file = NULL;
+    char echo_read_buf[READ_CHANNEL_BUFSIZE];
 
     int t;
 
@@ -144,11 +145,17 @@ int main(int argc, char *argv[])
         return t;
     }
 
-    printf("Started up. NOTICE: All hosts will be trusted.\n", );
+    printf("Started up. NOTICE: All hosts will be trusted.\n");
 
     // Start iterate each host
-    while(EOF != fscanf("%s %s %s", hostname, username, passwd))
+    while(EOF != fscanf(hosts_file, "%s %s %s", hostname, username, passwd))
     {
+        int sock;
+        sockaddr_in saddr_in;
+        LIBSSH2_SESSION *session = NULL;
+        LIBSSH2_CHANNEL *channel = NULL;
+
+        printf("============================================\n");
         printf("Connecting to %s@%s...\n", username, hostname);
         hostaddr = inet_addr(hostname);
 
@@ -156,7 +163,8 @@ int main(int argc, char *argv[])
         sock = socket(AF_INET, SOCK_STREAM, 0);
         saddr_in.sin_family = AF_INET;
         saddr_in.sin_port = htons(22);
-        if (connect(sock, (sockaddr*)(&sin), sizeof(sockaddr_in)) != 0)
+        saddr_in.sin_addr.s_addr = hostaddr;
+        if (connect(sock, (sockaddr*)(&saddr_in), sizeof(sockaddr_in)) != 0)
         {
             printf("Connection failed with errno: %d\n", errno);
             return errno;
@@ -206,8 +214,27 @@ int main(int argc, char *argv[])
         if (NULL == cmd_file)
         {
             printf("Open file <%s> failed. Errno: %d\n", cmd_file_path, errno);
+            clean_up_channel(channel);
+            clean_up_session(session);
+            clean_up_sock_libssh2(sock);
             return errno;
         }
+
+        // Open a file to hold the echo content from this host
+        // The file is named after host's IP
+        char echo_file_name[100] = {0};
+        strcpy(echo_file_name, hostname);
+        strcat(echo_file_name, ".echo.txt");
+        echo_file = fopen(echo_file_name, "a+");
+        if (NULL == echo_file)
+        {
+            printf("Open file <%s> failed. Errno: %d\n", echo_file_name, errno);
+            clean_up_channel(channel);
+            clean_up_session(session);
+            clean_up_sock_libssh2(sock);
+            return errno;
+        }
+        printf("Echo content will be stored in %s\n", echo_file_name);
 
         // Execute each command
         while (NULL != fgets(cmd_file_buf, READ_FILE_BUFSIZE, cmd_file))
@@ -222,9 +249,30 @@ int main(int argc, char *argv[])
                 clean_up_sock_libssh2(sock);
                 return t;
             }
+
+            // Read echo
+            do
+            {
+                t = libssh2_channel_read(channel, echo_read_buf, READ_CHANNEL_BUFSIZE);
+                if (t > 0)
+                {
+                    printf("We got %d bytes echo.\n", t);
+                    fwrite(echo_read_buf, t, 1, echo_file);
+                }
+                memset(echo_read_buf, 0, READ_CHANNEL_BUFSIZE);
+            } while (t > 0);
         }
         line_count = 0;
         fclose(cmd_file);
+        fclose(echo_file);
+
+        // This host done.
+        clean_up_channel(channel);
+        clean_up_session(session);
+        clean_up_sock_libssh2(sock);
+        printf("Host: %s done.\n", hostname);
     }
     fclose(hosts_file);
+    printf("All done.\n");
+    return 0;
 }
