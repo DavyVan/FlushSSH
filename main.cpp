@@ -82,8 +82,17 @@ void clean_up_channel(LIBSSH2_CHANNEL *channel)
     channel = NULL;
 }
 
+void CTRL_C_handler(int sig)
+{
+    // Ctrl + C: do clean-up and quit
+    printf("User abort, do nothing and quit. Goodbye.\n");
+}
+
 int main(int argc, char *argv[])
 {
+    // Register signal handler
+    signal(SIGINT, CTRL_C_handler);
+    
     // Claims
     const char *hosts_file_path = NULL;
     const char *cmd_file_path = NULL;
