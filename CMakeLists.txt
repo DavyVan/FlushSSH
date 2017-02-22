@@ -4,8 +4,8 @@ project(FlushSSH CXX)
 include (CheckIncludeFileCXX)
 
 # Version number
-set(FlushSSH_VERSION_MAJOR 0)
-set(FlushSSH_VERSION_MINOR 8)
+set(FlushSSH_VERSION_MAJOR 1)
+set(FlushSSH_VERSION_MINOR 0)
 
 message(STATUS "Building version: ${FlushSSH_VERSION_MAJOR}.${FlushSSH_VERSION_MINOR}")
 
