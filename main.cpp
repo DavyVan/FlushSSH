@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <memory.h>
+#include <signal.h>
 #include "FlushSSHConfig.h"
 #include <libssh2.h>
 
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
 {
     // Register signal handler
     signal(SIGINT, CTRL_C_handler);
-    
+
     // Claims
     const char *hosts_file_path = NULL;
     const char *cmd_file_path = NULL;
