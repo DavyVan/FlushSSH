@@ -1,4 +1,5 @@
-# FlushSSH
+# FlushSSH 
+[![Build status](https://ci.appveyor.com/api/projects/status/m232719gvcg0m1qc?svg=true)](https://ci.appveyor.com/project/DavyVan/flushssh)
 A tool helping to run CLI commands from files on multiple servers
 
 # Usage & Feathers
