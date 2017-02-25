@@ -10,6 +10,7 @@ install:
     - cd bin
     - cmake ..
     - cmake --build .
+    - cd ../../
 script:
     - mkdir build
     - cd build
