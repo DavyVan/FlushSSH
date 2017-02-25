@@ -1,4 +1,5 @@
 language: cpp
+dist: trusty
 sudo: required
 install:
     - sudo apt-get install -qq libssl-dev
