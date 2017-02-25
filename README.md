@@ -1,7 +1,14 @@
 # FlushSSH
 A tool helping to run CLI commands from files on multiple servers  
 [![Build status](https://ci.appveyor.com/api/projects/status/m232719gvcg0m1qc?svg=true)](https://ci.appveyor.com/project/DavyVan/flushssh)
-[![Build Status](https://travis-ci.org/DavyVan/FlushSSH.svg?branch=master)](https://travis-ci.org/DavyVan/FlushSSH)
+[![Build Status](https://travis-ci.org/DavyVan/FlushSSH.svg?branch=master)](https://travis-ci.org/DavyVan/FlushSSH)  
+
+
+# Installation
+Windwos: Use the setup.exe  
+Linux: For now, you must compile from source, please see HOW_TO_CONTRIBUTE.md  
+
+
 # Usage & Feathers
     FlushSSH {hosts_file_path} {cmd_file_path}  
 **hosts_file_path**: contains all of the hosts you want to connect, please use the following format.  
