@@ -1,0 +1,16 @@
+language: cpp
+install:
+    - sudo apt-get install -qq libssl-dev
+    - git clone https://github.com/libssh2/libssh2.git
+    - cd libssh2
+    - mkdir bin
+    - cd bin
+    - cmake ..
+    - cmake --build .
+script:
+    - mkdir build
+    - cd build
+    - cmake ..
+    - cmake --build .
+git:
+    depth: 3
