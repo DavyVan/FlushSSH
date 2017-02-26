@@ -32,4 +32,10 @@ For now, some limitations:
 
 Will be better in future versions.  
 ## Update history
+### V1.0 @ 2017.2.26 (1st release)
+* Add Travis-CI & Appveyor test
+* Add SIGINT handling
+* Add installer for Windows Vista+
+
+
 ### V0.8 @ 2017.2.22 (Initial)
