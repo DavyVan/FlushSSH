@@ -5,7 +5,7 @@ include (CheckIncludeFileCXX)
 
 # Version number
 set(FlushSSH_VERSION_MAJOR 1)
-set(FlushSSH_VERSION_MINOR 0)
+set(FlushSSH_VERSION_MINOR 1)
 
 message(STATUS "Building version: ${FlushSSH_VERSION_MAJOR}.${FlushSSH_VERSION_MINOR}")
 
@@ -24,12 +24,20 @@ configure_file(
     "${PROJECT_BINARY_DIR}/FlushSSHConfig.h"
 )
 
-# search path
 include_directories("${PROJECT_BINARY_DIR}")
+
+# find libraries
+# libssh2
 find_package(Libssh2 REQUIRED CONFIG)
 
+# compile & link
+add_library(utils utils.cpp)
+
+add_library(clean_up clean.cpp)
+target_link_libraries(clean_up Libssh2::libssh2)
+
 add_executable(FlushSSH main.cpp)
-target_link_libraries(FlushSSH Libssh2::libssh2)
+target_link_libraries(FlushSSH Libssh2::libssh2 utils clean_up)
 
 # Install rules
 install(TARGETS FlushSSH DESTINATION bin)

@@ -6,82 +6,17 @@
 #include <memory.h>
 #include <signal.h>
 #include "FlushSSHConfig.h"
+#include "clean.h"
+#include "utils.h"
 #include <libssh2.h>
 
-#ifdef HAVE_WINSOCK2_H
-#include <winsock2.h>
-#endif
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#ifdef HAVE_SYS_SELECT_H
-#include <sys/select.h>
-#endif
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
 #include <sys/types.h>
 
 #define ARGC 2
 #define READ_FILE_BUFSIZE 200
 #define READ_CHANNEL_BUFSIZE 32000
 
-void display_help()
-{
-    puts("Usage: FlushSSH hosts_file cmd_file");
-    puts("       Ctrl+C will terminate elegantly");
-    puts("hosts_file:");
-    puts("    IPaddr username passwd");
-    puts("cmd_file:");
-    puts("    One command per line.");
-}
 
-void clean_up_session(LIBSSH2_SESSION *session)
-{
-    libssh2_session_disconnect(session, "Shuting down, thank you.");
-    libssh2_session_free(session);
-    session = NULL;
-}
-
-void clean_up_sock_libssh2(int sock)
-{
-#ifdef WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
-    libssh2_exit();
-    printf("Terminated.\n");
-}
-
-void clean_up_channel(LIBSSH2_CHANNEL *channel)
-{
-    int exitcode;
-    int t;
-    char *exitsignal = NULL;
-
-    t = libssh2_channel_close(channel);
-    if (0 == t)
-    {
-        exitcode = libssh2_channel_get_exit_status(channel);
-        libssh2_channel_get_exit_signal(channel, &exitsignal, NULL, NULL, NULL, NULL, NULL);
-    }
-    if (exitsignal)
-        printf("Got signal: %s\n", exitsignal);
-    else
-        printf("Abort: %d\n", exitcode);
-    libssh2_channel_free(channel);
-    channel = NULL;
-}
 
 void CTRL_C_handler(int sig)
 {
