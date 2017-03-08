@@ -38,7 +38,10 @@ int main(int argc, char *argv[])
 
     char hostname[100];
     char username[100];
+    char kpflag;
     char passwd[100];
+    char pub_key_file[100];
+    char prv_key_file[100];
     unsigned long hostaddr;
 
     char cmd_file_buf[READ_FILE_BUFSIZE];
@@ -90,10 +93,10 @@ int main(int argc, char *argv[])
         return t;
     }
 
-    printf("Started up. NOTICE: All hosts will be trusted.\n");
+    printf("Started up. NOTICE: Known-host check will be skiped.\n");
 
     // Start iterate each host
-    while(EOF != fscanf(hosts_file, "%s %s %s", hostname, username, passwd))
+    while(EOF != fscanf(hosts_file, "%s %s %c", hostname, username, kpflag))    // TODO: edit to here last time
     {
         int sock;
         sockaddr_in saddr_in;

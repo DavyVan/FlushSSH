@@ -6,16 +6,20 @@ A tool helping to run CLI commands from files on multiple servers
 
 # Installation
 Windwos: Use the setup.exe  
-Linux: For now, you must compile from source, please see HOW_TO_CONTRIBUTE.md  
+Linux: For now, you must compile from source, please see CONTRIBUTING.md  
 
 
-# Usage & Feathers
+# Usage & Featheres
     FlushSSH {hosts_file_path} {cmd_file_path}  
-**hosts_file_path**: contains all of the hosts you want to connect, please use the following format.  
+**hosts_file_path**: A space separated file which contains all of the hosts you want to connect, please use the following format.  
 
-    +---------------+----------+----------+   
-    |hostsname (IP) | username | password |
-    +---------------+----------+----------+
+    +--------------+----------+-----+-----------------------------+   
+    |hostname (IP) | username | P/K | {password | key_file_paths} |
+    +--------------+----------+-----+-----------------------------+
+
+* To find a example, please see hosts_file_example.txt
+* "hostname" can only be IP address, for now.
+* "P/K" (Capital): "P" if this host use password to authenticate and follows the password after a space, or "K" if it uses public/private key pair and follows two file path (public key & private key, only separated files supported) after a space.
 
 **cmd_file_path**: Contains all of the commands you want to execute on remote host(s). The format is quite simple with one command per line. e.g.
 
@@ -31,11 +35,15 @@ For now, some limitations:
 * Only on Windows, only Windows 10 is tested.
 
 Will be better in future versions.  
-## Update history
-### V1.0 @ 2017.2.26 (1st release)
+# Update history
+## V1.6 @ 2017.x.xx (current release)
+* 
+
+
+## V1.0 @ 2017.2.26 (1st release)
 * Add Travis-CI & Appveyor test
 * Add SIGINT handling
 * Add installer for Windows Vista+
 
 
-### V0.8 @ 2017.2.22 (Initial)
+## V0.8 @ 2017.2.22 (Initial)

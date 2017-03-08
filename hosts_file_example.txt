@@ -1,2 +1,3 @@
-8.8.8.8 root passwdxxxx
-223.5.5.5 root passwdxxxx
+8.8.8.8 root P passwdxxxx
+223.5.5.5 root P passwdxxxx
+8.8.4.4 root K pub_rsa.txt prv_rsa.txt
