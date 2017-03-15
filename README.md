@@ -32,7 +32,7 @@ For now, some limitations:
 * Connect and execute one by one.
 * Store all of the echo in files, one host one file, named after hosts' hostname(IP).  
 * Only support port 22.
-* Only on Windows, only Windows 10 is tested.
+* Only with IPv4
 
 Will be better in future versions.  
 # Update history

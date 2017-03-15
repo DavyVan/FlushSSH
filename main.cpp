@@ -9,6 +9,7 @@
 #include "clean.h"
 #include "utils.h"
 #include <libssh2.h>
+#include <cstring>
 
 #include <sys/types.h>
 
@@ -22,6 +23,7 @@ void CTRL_C_handler(int sig)
 {
     // Ctrl + C: do clean-up and quit
     printf("User abort, do nothing and quit. Goodbye.\n");
+    exit(1);
 }
 
 int main(int argc, char *argv[])
@@ -37,6 +39,8 @@ int main(int argc, char *argv[])
     FILE *cmd_file = NULL;
 
     char hostname[100];
+    char hostip[100];
+    addrinfo *echo_hostaddr;
     char username[100];
     char kpflag;
     char passwd[100];
@@ -96,16 +100,37 @@ int main(int argc, char *argv[])
     printf("Started up. NOTICE: Known-host check will be skiped.\n");
 
     // Start iterate each host
-    while(EOF != fscanf(hosts_file, "%s %s %c", hostname, username, kpflag))    // TODO: edit to here last time
+    while(EOF != fscanf(hosts_file, "%s %s %c", hostname, username, &kpflag))    // TODO: edit to here last time, it's bout key auth.
     {
         int sock;
         sockaddr_in saddr_in;
         LIBSSH2_SESSION *session = NULL;
         LIBSSH2_CHANNEL *channel = NULL;
 
+        // Start processing this host
         printf("============================================\n");
-        printf("Connecting to %s@%s...\n", username, hostname);
-        hostaddr = inet_addr(hostname);
+        printf("Resolving %s...", hostname);
+
+        addrinfo hint;
+        memset(&hint, 0, sizeof(hint));
+        hint.ai_family = AF_INET;
+        hint.ai_socktype = SOCK_STREAM;
+
+        t = getaddrinfo(hostname, NULL, &hint, &echo_hostaddr);
+        if (t != 0)
+        {
+            // if failed, output message and skip this host
+            printf("Failed, skip.\n");
+            fgets(cmd_file_buf, READ_FILE_BUFSIZE, hosts_file);
+            continue;
+        }
+        // Only pick the first address echoed, convert to dot-decimal notation
+        inet_ntop(AF_INET, &(((sockaddr_in *)(echo_hostaddr->ai_addr))->sin_addr), hostip, 100);
+        printf("%s\n", hostip);
+
+        // Connect
+        printf("Connecting...\n");
+        hostaddr = inet_addr(hostip);   // convert to long int
 
         // Create a socket connection
         sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -115,7 +140,9 @@ int main(int argc, char *argv[])
         if (connect(sock, (sockaddr*)(&saddr_in), sizeof(sockaddr_in)) != 0)
         {
             printf("Connection failed with errno: %d\n", errno);
-            return errno;
+            fgets(cmd_file_buf, READ_FILE_BUFSIZE, hosts_file);
+            // return errno;
+            continue;
         }
 
         // Create a session instance
@@ -133,17 +160,34 @@ int main(int argc, char *argv[])
         if (0 != t)
         {
             printf("SSH handshake failed with errno: %d\n", t);
-            return t;
+            // return t;
+            continue;
+        }
+            // libssh2_trace(session, ~0);
+
+        // Authentication
+        if(kpflag == 'P')   // password
+        {
+            printf("Authenticating via password...\n");
+            fscanf(hosts_file, "%s", passwd);
+            while ((t = libssh2_userauth_password(session, username, passwd)) == LIBSSH2_ERROR_EAGAIN);     // This while loop is for non-blocking session
+        }
+        else if(kpflag == 'K')
+        {
+            printf("Authenticating via key pair...\n");
+            fscanf(hosts_file, "%s %s %s", pub_key_file, prv_key_file, passwd);
+            while ((t = libssh2_userauth_publickey_fromfile_ex(session, username, strlen(username), pub_key_file, prv_key_file, passwd)) == LIBSSH2_ERROR_EAGAIN);
         }
 
-        // Authenticate via passwd
-        while ((t = libssh2_userauth_password(session, username, passwd)) == LIBSSH2_ERROR_EAGAIN);     // This while loop is for non-blocking session
         if (0 != t)
         {
             printf("Authentication failed.\n");
+            if(t == LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED)
+                printf("key unverified\n");
             clean_up_session(session);
             clean_up_sock_libssh2(sock);
-            return t;
+            // return t;
+            continue;
         }
 
         // Create channel blocking
@@ -188,7 +232,10 @@ int main(int argc, char *argv[])
         while (NULL != fgets(cmd_file_buf, READ_FILE_BUFSIZE, cmd_file))
         {
             line_count++;
-            t = libssh2_channel_exec(channel, cmd_file_buf);
+            char *p = trim(cmd_file_buf);
+            if(strlen(p) == 0)
+                continue;
+            t = libssh2_channel_exec(channel, p);
             if (t != 0)
             {
                 printf("Exec failed on line: %d.\n", line_count);
