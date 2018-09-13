@@ -197,7 +197,8 @@ int main(int argc, char *argv[])
             printf("Create channel failed\n");
             clean_up_session(session);
             clean_up_sock_libssh2(sock);
-            return -1;
+            // return -1;
+            continue;
         }
 
         // Read cmd_file
